@@ -1,5 +1,6 @@
 #### 1.44 待发布
 fix: 修复 useFetchPluginXml
+chore: 升级 danmaku 上游依赖版本
 
 #### 1.43
 feat: 简易实现加载媒体服务端xml弹幕
