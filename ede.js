@@ -3,7 +3,7 @@
 // @description  Emby弹幕插件 - Emby风格
 // @namespace    https://github.com/chen3861229/dd-danmaku
 // @author       chen3861229
-// @version      1.43
+// @version      1.44
 // @copyright    2022, RyoLee (https://github.com/RyoLee)
 // @license      MIT; https://raw.githubusercontent.com/RyoLee/emby-danmaku/master/LICENSE
 // @icon         https://github.githubassets.com/pinned-octocat.svg
@@ -20,6 +20,7 @@
     let corsProxy = 'https://ddplay-api.7o7o.cc/cors/';
     // ------ 用户配置 end ------
     // note01: 部分 AndroidTV 仅支持最高 ES9 (支持 webview 内核版本 60 以上)
+    // note02: url 禁止使用相对路径,非 web 环境的根路径为文件路径,非 http
     // ------ 程序内部使用,请勿更改 start ------
     const openSourceLicense = {
         self: { version: '1.43', name: 'Emby Danmaku Extension(Forked form original:1.11)', license: 'MIT License', url: 'https://github.com/chen3861229/dd-danmaku' },
@@ -976,7 +977,7 @@
     async function getCommentsByPluginApi(mediaServerItemId) {
         // const path = window.location.pathname.replace(/\/web\/(index\.html)?/, '/api/danmu/');
         // const url = window.location.origin + path + jellyfinItemId + '/raw';
-        const url = `/api/danmu/${mediaServerItemId}/raw?X-Emby-Token=${ApiClient.accessToken()}`;
+        const url = `${ApiClient.serverAddress()}/api/danmu/${mediaServerItemId}/raw?X-Emby-Token=${ApiClient.accessToken()}`;
         const response = await fetch(url);
         if (!response.ok) {
             return null;
@@ -1150,12 +1151,16 @@
                 .then((comments) => {
                     if (comments && comments.length > 0) {
                         return createDanmaku(comments).then(() => {
-                            console.log(lsKeys.useFetchPluginXml.name + '就位');
+                            console.log(lsKeys.useFetchPluginXml.name + ':就位');
                         }).then(() => {
                             window.ede.loading = false;
                             const danmakuCtrEle = getById(eleIds.danmakuCtr);
                             if (danmakuCtrEle && danmakuCtrEle.style.opacity !== '1') {
                                 danmakuCtrEle.style.opacity = '1';
+                            }
+                            const videoOsdDanmakuTitle = getById(eleIds.videoOsdDanmakuTitle);
+                            if (videoOsdDanmakuTitle && videoOsdDanmakuTitle.innerText.includes('未匹配')) {
+                                videoOsdDanmakuTitle.innerText = `弹幕：${lsKeys.useFetchPluginXml.name} - ${comments.length}条`;
                             }
                         });
                     }
@@ -1561,7 +1566,7 @@
                             <div style="${styles.embySlider}">
                                 <label class="${classes.embyLabel}" style="width: 5em;">${lsKeys.fontFamily.name}: </label>
                                 <div id="${eleIds.fontFamilyDiv}" class="${classes.embySelectWrapper}"></div>
-                                <label id="${eleIds.fontFamilyLabel}" style="width: 10em;"></label>
+                                <label id="${eleIds.fontFamilyLabel}" style="width: 10em; margin-left: 1em;"></label>
                             </div>
                             <div style="max-width: 31.5em;">
                                 <label class="${classes.embyLabel}" style="width: 5em;">弹幕外观: </label>
