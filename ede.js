@@ -573,7 +573,7 @@
         if (_media.getAttribute('ede_listening')) { return; }
         console.log('正在初始化Listener');
         playbackEventsOn({ 'playbackstart': (e, state) => { loadDanmaku(LOAD_TYPE.INIT); console.log(e.type); } });
-        playbackEventsOn({ 'playbackstop': onPlaybackStopped });
+        playbackEventsOn({ 'playbackstop': onPlaybackStop });
         _media.setAttribute('ede_listening', true);
         document.addEventListener('video-osd-show', (e) => {
             console.log(e.type, e);
@@ -687,7 +687,7 @@
         return extComments;
     }
 
-    function onPlaybackStopped(e, state) {
+    function onPlaybackStop(e, state) {
         if (!state.NowPlayingItem) { return console.log('跳过 Web 端自身错误触发的第二次播放停止事件'); }
         console.log(e.type);
         const positionTicks = state.PlayState.PositionTicks;
@@ -726,7 +726,9 @@
         const animeId = episode_info.animeId;
         if (!subjectId) {
             if (!animeId) { throw new Error('未获取到 animeId'); }
-            bangumiUrl = (await fetchJson(dandanplayApi.getBangumi(animeId))).bangumi.bangumiUrl;
+            const danDanPlayBangumiRes = await fetchJson(dandanplayApi.getBangumi(animeId));
+            episode_info.bgmEpisodeIndex = offsetBgmEpisodeIndex(episode_info.bgmEpisodeIndex, danDanPlayBangumiRes.bangumi);
+            bangumiUrl = danDanPlayBangumiRes.bangumi.bangumiUrl;
             if (!bangumiUrl) { throw new Error('未请求到 bangumiUrl'); }
             subjectId = parseInt(bangumiUrl.match(/\/(\d+)$/)[1]);
         }
@@ -736,6 +738,19 @@
         window.ede.bangumiInfo = bangumiInfo;
         localStorage.setItem(bangumiInfo._bangumi_key, JSON.stringify(bangumiInfo));
         return bangumiInfo;
+    }
+
+    function offsetBgmEpisodeIndex(currentBgmEpisodeIndex, danDanPlayBangumi) {
+        if (!danDanPlayBangumi) {
+            return currentBgmEpisodeIndex;
+        }
+        let bangumiEp = danDanPlayBangumi.episodes[currentBgmEpisodeIndex];
+        if (!bangumiEp) {
+            console.log(`未匹配到 danDanPlayBangumi 番剧集数,剧集不为第一季,尝试切换接口数据匹配返回修正后的 bgmEpisodeIndex`);
+            return danDanPlayBangumi.episodes.findIndex(ep => ep.episodeNumber == currentBgmEpisodeIndex + 1);
+        } else {
+            return currentBgmEpisodeIndex;
+        }
     }
 
     async function putBangumiEpStatus(token) {
