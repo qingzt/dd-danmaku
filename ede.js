@@ -408,6 +408,7 @@
         },
     };
     const styles = {
+        // 更改 checkboxList 垂直排列为横向自动
         embyCheckboxList: 'display: flex;flex-wrap: wrap;',
         // 容器内元素垂直排列,水平居中
         embySliderList: 'display: flex;flex-direction: column;justify-content: center;align-items: center;',
@@ -2123,7 +2124,7 @@
                 </div>
                 <div is="emby-collapse" title="额外设置">
                     <div class="${classes.collapseContentNav}" style="padding-top: 0.5em !important;">
-                        <div id="${eleIds.extCheckboxDiv}"></div>
+                        <div id="${eleIds.extCheckboxDiv}" class="${classes.embyCheckboxList}" style="${styles.embyCheckboxList}"></div>
                         <div id="${eleIds.danmakuChConverDiv}" style="margin-bottom: 0.2em;">
                             <label class="${classes.embyLabel}">${lsKeys.chConvert.name}: </label>
                         </div>
@@ -2551,17 +2552,17 @@
 
     function buildDebugButton(container) {
         const debugWrapper = getById(eleIds.debugButton, container);
-        debugWrapper.append(embyButton({ label: '打印环境信息' }, () => {
+        debugWrapper.append(embyButton({ label: '打印环境信息', style: 'margin: 0.3em;' }, () => {
             require(['browser'], (browser) => {
                 console.log('Emby 内部自身判断: ', browser);
             });
         }));
-        debugWrapper.append(embyButton({ label: '打印弹幕引擎信息' }, () => {
+        debugWrapper.append(embyButton({ label: '打印弹幕引擎信息', style: 'margin: 0.3em;' }, () => {
             const msg = `弹幕引擎是否存在: ${!!window.Danmaku}, 弹幕引擎是否实例化成功: ${!!window.ede.danmaku}`;
             console.log(msg);
             embyToast({ text: msg });
         }));
-        debugWrapper.append(embyButton({ label: '打印视频加载方' }, () => {
+        debugWrapper.append(embyButton({ label: '打印视频加载方', style: 'margin: 0.3em;' }, () => {
             const _media = document.querySelector(mediaQueryStr);
             if (!_media) { return console.error('严重错误,页面中依旧不存在 <video> 标签') }
             if (_media.currentTime < 1) { console.error('严重错误,<video> 的 currentTime < 1') }
@@ -2577,12 +2578,12 @@
                 }
             }
         }));
-        debugWrapper.append(embyButton({ label: '清空章节引用缓存', class: classes.embyButtons.submit }, () => {
+        debugWrapper.append(embyButton({ label: '清空章节引用缓存', class: classes.embyButtons.submit, style: 'margin: 0.3em;' }, () => {
             lsBatchRemove(['_episode_id_rel_', '_bangumi_episode_id_rel_']);
             console.log('已清空章节引用缓存');
             embyToast({ text: '已清空章节引用缓存' });
         }));
-        debugWrapper.append(embyButton({ label: '重置设置', class: classes.embyButtons.submit }, () => {
+        debugWrapper.append(embyButton({ label: '重置设置', class: classes.embyButtons.submit, style: 'margin: 0.3em;' }, () => {
             settingsReset();
             console.log(`已重置设置, 跳过了 ${lsKeys.filterKeywords.name} 重置`);
             embyToast({ text: `已重置设置, 跳过了 ${lsKeys.filterKeywords.name} 重置` });
