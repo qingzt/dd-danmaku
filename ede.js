@@ -218,6 +218,7 @@
         osdLineChartEnable: { id: 'danmakuOsdLineChartEnable', defaultValue: false, name: '进度条上显示弹幕每秒内数量折线图' },
         // removeEmojiEnable: { id: 'danmakuRemoveEmojiEnable', defaultValue: false, name: '移除弹幕中的emoji' },
         useFetchPluginXml: { id: 'danmakuUseFetchPluginXml', defaultValue: false, name: '加载媒体服务端xml弹幕' },
+        // refreshPluginXml: { id: 'danmakuRefreshPluginXml', defaultValue: false, name: '加载前刷新媒体服务端xml弹幕' },
         debugShowDanmakuWrapper: { id: 'danmakuDebugShowDanmakuWrapper', defaultValue: false, name: '弹幕容器边界' },
         debugShowDanmakuCtrWrapper: { id: 'danmakuDebugShowDanmakuCtrWrapper', defaultValue: false, name: '按钮容器边界' },
         debugReverseDanmu: { id: 'danmakuDebugReverseDanmu', defaultValue: false, name: '反转弹幕方向' },
@@ -337,6 +338,7 @@
         openSourceLicenseDiv: 'openSourceLicenseDiv',
         videoOsdDanmakuTitle: 'videoOsdDanmakuTitle',
         extCheckboxDiv: 'extCheckboxDiv',
+        danmuPluginDiv: 'danmuPluginDiv',
         danmakuSettingBtnDebug: 'danmakuSettingBtnDebug',
         progressBarLineChart: 'progressBarLineChart',
     };
@@ -1025,7 +1027,18 @@
 
             return comments;
         } catch (error) {
+            console.error('Failed to parse XML data:', error);
             return null;
+        }
+    }
+
+    async function refreshPluginXml(mediaServerItemId) {
+        const url = `${ApiClient.serverAddress()}/api/danmu/${mediaServerItemId}?option=Refresh&X-Emby-Token=${ApiClient.accessToken()}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            console.log(lsKeys.refreshPluginXml.name + ':成功');
+        } else {
+            throw new Error(lsKeys.refreshPluginXml.name + ':失败');
         }
     }
 
@@ -1162,6 +1175,11 @@
         }
         window.ede.loading = true;
         if (lsGetItem(lsKeys.useFetchPluginXml.id)) {
+            // if (lsGetItem(lsKeys.refreshPluginXml.id)) {
+            //     refreshPluginXml(window.ede.itemId).catch((error) => {
+            //         console.error(error);
+            //     });
+            // }
             getMapByEmbyItemInfo().then((itemInfoMap) => {
                 getCommentsByPluginApi(window.ede.itemId)
                 .then((comments) => {
@@ -1178,6 +1196,9 @@
                             if (videoOsdDanmakuTitle && videoOsdDanmakuTitle.innerText.includes('未匹配')) {
                                 videoOsdDanmakuTitle.innerText = `弹幕：${lsKeys.useFetchPluginXml.name} - ${comments.length}条`;
                             }
+                        }).catch((error) => {
+                            console.error(error);
+                            console.error('useFetchPluginXml createDanmaku error');
                         });
                     }
                     throw new Error(lsKeys.useFetchPluginXml.name + '失败,尝试在线加载');
@@ -1885,18 +1906,29 @@
                         </div>
                     </div>
                 </div>
+                <div is="emby-collapse" title="服务端 Danmu 插件">
+                    <div class="${classes.collapseContentNav}">
+                        <div id="${eleIds.danmuPluginDiv}" class="${classes.embyCheckboxList}" style="${styles.embyCheckboxList}"></div>
+                    </div>
+                </div>
             </div>
         `;
         container.innerHTML = template.trim();
-        const searchNameDiv = getById(eleIds.danmakuSearchNameDiv, container);
+        buildSearchEpisodeEle();
+        buildExtCommentDiv();
+        buildDanmuPluginDiv();
+    }
+
+    function buildSearchEpisodeEle() {
+        const searchNameDiv = getById(eleIds.danmakuSearchNameDiv);
         searchNameDiv.append(embyInput({ id: eleIds.danmakuSearchName, value: window.ede.searchDanmakuOpts.animeName, type: 'search' }
             , doDanmakuSearchEpisode));
         searchNameDiv.append(embyButton({ label: '搜索', iconKey: iconKeys.search}, doDanmakuSearchEpisode));
         searchNameDiv.append(embyButton({ label: '切换[原]标题', iconKey: iconKeys.text_format }, doSearchTitleSwtich));
-        getById(eleIds.danmakuEpisodeLoad, container).append(
+        getById(eleIds.danmakuEpisodeLoad).append(
             embyButton({ id: eleIds.danmakuSwitchEpisode, label: '加载弹幕', iconKey: iconKeys.done }, doDanmakuSwitchEpisode)
         );
-        const currentMatchedDiv = getById(eleIds.currentMatchedDiv, container);
+        const currentMatchedDiv = getById(eleIds.currentMatchedDiv);
         currentMatchedDiv.append(
             embyButton({ label: '取消匹配/清空弹幕', iconKey: iconKeys.close }, (e) => {
                 if (window.ede.episode_info && window.ede.episode_info.episodeId) {
@@ -1908,8 +1940,10 @@
                 currentMatchedDiv.querySelector('label').textContent = '弹弹 play 总量: 0';
             })
         );
-        // buildExtComment
-        const extCommentSearchDiv = getById(eleIds.extCommentSearchDiv, container);
+    }
+
+    function buildExtCommentDiv() {
+        const extCommentSearchDiv = getById(eleIds.extCommentSearchDiv);
         buildExtUrlsDiv();
         extCommentSearchDiv.append(embyInput({ type: 'search', placeholder: 'http(s)://' }, onEnterExtComment));
         extCommentSearchDiv.append(embyButton({ label: '搜索', iconKey: iconKeys.search}, onEnterExtComment));
@@ -1959,6 +1993,19 @@
             buildExtUrlsDiv();
         })
         .catch(err => console.log(err));
+    }
+
+    function buildDanmuPluginDiv() {
+        getById(eleIds.danmuPluginDiv).append(embyCheckbox(
+            { label: lsKeys.useFetchPluginXml.name }, lsGetItem(lsKeys.useFetchPluginXml.id), (checked) => {
+                lsSetItem(lsKeys.useFetchPluginXml.id, checked);
+            }
+        ));
+        // getById(eleIds.danmuPluginDiv).append(embyCheckbox(
+        //     { label: lsKeys.refreshPluginXml.name }, lsGetItem(lsKeys.refreshPluginXml.id), (checked) => {
+        //         lsSetItem(lsKeys.refreshPluginXml.id, checked);
+        //     }
+        // ));
     }
 
     function buildCurrentDanmakuInfo(containerId) {
@@ -2252,11 +2299,6 @@
         //         lsSetItem(lsKeys.removeEmojiEnable.id, checked);
         //     }
         // ));
-        getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
-            { label: lsKeys.useFetchPluginXml.name }, lsGetItem(lsKeys.useFetchPluginXml.id), (checked) => {
-                lsSetItem(lsKeys.useFetchPluginXml.id, checked);
-            }
-        ));
         getById(eleIds.danmakuChConverDiv, container).append(
             embyTabs(danmakuChConverOpts, window.ede.chConvert, 'id', 'name', doDanmakuChConverChange)
         );

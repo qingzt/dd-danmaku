@@ -3,6 +3,7 @@ fix: 修复 useFetchPluginXml
 fix: 修复多季下的 putBangumiEpStatus
 fix: 优化部分元素间距
 chore: 升级 danmaku 上游依赖版本
+refactor: 拆分 buildDanmuPluginDiv
 
 #### 1.43
 feat: 简易实现加载媒体服务端xml弹幕
