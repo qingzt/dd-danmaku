@@ -1,9 +1,14 @@
 #### 1.44 待发布
+feat: 合并相似弹幕设置项
+feat: 播放界面头中显示时钟设置项
+feat: 自动过滤弹幕数阈值设置项
 fix: 修复 useFetchPluginXml
 fix: 修复多季下的 putBangumiEpStatus
 fix: 优化部分元素间距
+fix: 加载时检测媒体分类
 chore: 升级 danmaku 上游依赖版本
-refactor: 拆分 buildDanmuPluginDiv
+refactor: 移动 buildDanmuPluginDiv UI
+refactor: 简化 embySlider,增强 waitForElement
 
 #### 1.43
 feat: 简易实现加载媒体服务端xml弹幕
