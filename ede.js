@@ -3,7 +3,7 @@
 // @description  Emby弹幕插件 - Emby风格
 // @namespace    https://github.com/chen3861229/dd-danmaku
 // @author       chen3861229
-// @version      1.44
+// @version      1.45
 // @copyright    2022, RyoLee (https://github.com/RyoLee)
 // @license      MIT; https://raw.githubusercontent.com/RyoLee/emby-danmaku/master/LICENSE
 // @icon         https://github.githubassets.com/pinned-octocat.svg
@@ -23,7 +23,7 @@
     // note02: url 禁止使用相对路径,非 web 环境的根路径为文件路径,非 http
     // ------ 程序内部使用,请勿更改 start ------
     const openSourceLicense = {
-        self: { version: '1.44', name: 'Emby Danmaku Extension(Forked form original:1.11)', license: 'MIT License', url: 'https://github.com/chen3861229/dd-danmaku' },
+        self: { version: '1.45', name: 'Emby Danmaku Extension(Forked from original:1.11)', license: 'MIT License', url: 'https://github.com/chen3861229/dd-danmaku' },
         original: { version: '1.11', name: 'Emby Danmaku Extension', license: 'MIT License', url: 'https://github.com/RyoLee/emby-danmaku' },
         jellyfinFork: { version: '1.52', name: 'Jellyfin Danmaku Extension', license: 'MIT License', url: 'https://github.com/Izumiko/jellyfin-danmaku' },
         danmaku: { version: '2.0.8', name: 'Danmaku', license: 'MIT License', url: 'https://github.com/weizhenye/Danmaku' },
@@ -215,11 +215,13 @@
         mergeSimilarTime: { id: 'danmakuMergeSimilarTime', defaultValue: 10, name: '相似度时间窗口秒', min: 1, max: 60, step: 1 },
         filterKeywords: { id: 'danmakuFilterKeywords', defaultValue: '', name: '屏蔽关键词' },
         filterKeywordsEnable: { id: 'danmakuFilterKeywordsEnable', defaultValue: true, name: '屏蔽关键词启用' },
-        osdTitleEnable: { id: 'danmakuOsdTitleEnable', defaultValue: false, name: '播放界面右下角显示弹幕信息' },
-        osdLineChartEnable: { id: 'danmakuOsdLineChartEnable', defaultValue: false, name: '进度条上显示弹幕每秒内数量折线图' },
-        osdHeaderClockEnable: { id: 'danmakuOsdHeaderClockEnable', defaultValue: false, name: '播放界面头中显示时钟' },
         // removeEmojiEnable: { id: 'danmakuRemoveEmojiEnable', defaultValue: false, name: '移除弹幕中的emoji' },
         engine: { id: 'danmakuEngine', defaultValue: 'canvas', name: '弹幕引擎' },
+        osdTitleEnable: { id: 'danmakuOsdTitleEnable', defaultValue: false, name: '播放界面右下角显示弹幕信息' },
+        osdLineChartEnable: { id: 'danmakuOsdLineChartEnable', defaultValue: false, name: '弹幕高能进度条' },
+        osdLineChartSkipFilter: { id: 'danmakuOsdLineChartSkipFilter', defaultValue: false, name: '弹幕高能进度条免过滤' },
+        osdLineChartTime: { id: 'danmakuOsdLineChartTime', defaultValue: 10, name: '弹幕高能进度条颗粒度秒', min: 1, max: 60, step: 1  },
+        osdHeaderClockEnable: { id: 'danmakuOsdHeaderClockEnable', defaultValue: false, name: '播放界面头中显示时钟' },
         timeoutCallbackUnit: { id: 'danmakuTimeoutCallbackUnit', defaultValue: 1, name: '定时单位' },
         timeoutCallbackValue: { id: 'danmakuTimeoutCallbackValue', defaultValue: 0, name: '定时值' },
         bangumiEnable: { id: 'danmakuBangumiEnable', defaultValue: false, name: '启用并填写个人令牌' },
@@ -342,6 +344,9 @@
         openSourceLicenseDiv: 'openSourceLicenseDiv',
         videoOsdDanmakuTitle: 'videoOsdDanmakuTitle',
         extCheckboxDiv: 'extCheckboxDiv',
+        osdCheckboxDiv: 'osdCheckboxDiv',
+        osdLineChartDiv: 'osdLineChartDiv',
+        osdLineChartTimeDiv: "osdLineChartTimeDiv",
         danmuPluginDiv: 'danmuPluginDiv',
         danmakuSettingBtnDebug: 'danmakuSettingBtnDebug',
         progressBarLineChart: 'progressBarLineChart',
@@ -1145,7 +1150,11 @@
         if (chartEle) {
             chartEle.remove();
         }
-        const comments = window.ede.danmaku ? window.ede.danmaku.comments : [];
+        if (!window.ede.danmaku) {
+            return;
+        }
+        const osdLineChartSkipFilter = lsGetItem(lsKeys.osdLineChartSkipFilter.id);
+        const comments = osdLineChartSkipFilter ? window.ede.commentsParsed : window.ede.danmaku.comments;
         const container = getByClass(classes.videoOsdPositionSliderContainer);
         if (!comments || !container || (comments && comments.length === 0)) {
             return;
@@ -1162,7 +1171,7 @@
         const ctx = bulletChartCanvas.getContext('2d');
         // 计算每个时间点的弹幕数量
         const maxTime = Math.max(...comments.map(c => c.time));
-        const timeStep = 1;
+        const timeStep = lsGetItem(lsKeys.osdLineChartTime.id);
         const timeCounts = Array.from({ length: Math.ceil(maxTime / timeStep) }, () => 0);
         comments.forEach(c => {
             const index = Math.floor(c.time / timeStep);
@@ -2352,6 +2361,19 @@
                         </div>
                     </div>
                 </div>
+                <div is="emby-collapse" title="播放界面设置">
+                    <div class="${classes.collapseContentNav}">
+                        <div id="${eleIds.osdCheckboxDiv}" class="${classes.embyCheckboxList}" style="${styles.embyCheckboxList}"></div>
+                        <div>
+                            <div id="${eleIds.osdLineChartDiv}" class="${classes.embyCheckboxList}" style="${styles.embyCheckboxList}"></div>
+                            <div style="${styles.embySlider}">
+                                <label class="${classes.embyLabel}" style="width: 12em;">${lsKeys.osdLineChartTime.name}: </label>
+                                <div id="${eleIds.osdLineChartTimeDiv}" style="width: 15.5em; text-align: center;"></div>
+                                <label style="${styles.embySliderLabel}"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div is="emby-collapse" title="播放设置">
                     <div class="${classes.collapseContentNav}">
                         <label class="${classes.embyLabel}">单次定时执行: </label>
@@ -2400,6 +2422,7 @@
         container.innerHTML = template.trim();
         buildDanmakuFilterSetting(container);
         buildExtSetting(container);
+        buildOsdSetting();
         buildPlaySetting(container);
         buildBangumiSetting(container);
         buildCustomUrlSetting(container);
@@ -2460,7 +2483,21 @@
     }
 
     function buildExtSetting(container) {
-        getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
+        // getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
+        //     { label: lsKeys.removeEmojiEnable.name }, lsGetItem(lsKeys.removeEmojiEnable.id), (checked) => {
+        //         lsSetItem(lsKeys.removeEmojiEnable.id, checked);
+        //     }
+        // ));
+        getById(eleIds.danmakuChConverDiv, container).append(
+            embyTabs(danmakuChConverOpts, window.ede.chConvert, 'id', 'name', doDanmakuChConverChange)
+        );
+        getById(eleIds.danmakuEngineDiv, container).append(
+            embyTabs(danmakuEngineOpts, lsGetItem(lsKeys.engine.id), 'id', 'name', doDanmakuEngineSelect)
+        );
+    }
+
+    function buildOsdSetting() {
+        getById(eleIds.osdCheckboxDiv).append(embyCheckbox(
             { label: lsKeys.osdTitleEnable.name }, lsGetItem(lsKeys.osdTitleEnable.id), (checked) => {
                 lsSetItem(lsKeys.osdTitleEnable.id, checked);
                 const videoOsdContainer = document.querySelector(`${mediaContainerQueryStr} .videoOsdSecondaryText`);
@@ -2472,7 +2509,13 @@
                 }
             }
         ));
-        getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
+        getById(eleIds.osdCheckboxDiv).append(embyCheckbox(
+            { label: lsKeys.osdHeaderClockEnable.name }, lsGetItem(lsKeys.osdHeaderClockEnable.id), (checked) => {
+                lsSetItem(lsKeys.osdHeaderClockEnable.id, checked);
+                checked ? addHeaderClock() : removeHeaderClock();
+            }
+        ));
+        getById(eleIds.osdLineChartDiv).append(embyCheckbox(
             { label: lsKeys.osdLineChartEnable.name }, lsGetItem(lsKeys.osdLineChartEnable.id), (checked) => {
                 lsSetItem(lsKeys.osdLineChartEnable.id, checked);
                 const progressBarLineChart = getById(eleIds.progressBarLineChart);
@@ -2483,22 +2526,15 @@
                 }
             }
         ));
-        getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
-            { label: lsKeys.osdHeaderClockEnable.name }, lsGetItem(lsKeys.osdHeaderClockEnable.id), (checked) => {
-                lsSetItem(lsKeys.osdHeaderClockEnable.id, checked);
-                checked ? addHeaderClock() : removeHeaderClock();
+        getById(eleIds.osdLineChartDiv).append(embyCheckbox(
+            { label: lsKeys.osdLineChartSkipFilter.name }, lsGetItem(lsKeys.osdLineChartSkipFilter.id), (checked) => {
+                lsSetItem(lsKeys.osdLineChartSkipFilter.id, checked);
+                buildProgressBarChart(20);
             }
         ));
-        // getById(eleIds.extCheckboxDiv, container).append(embyCheckbox(
-        //     { label: lsKeys.removeEmojiEnable.name }, lsGetItem(lsKeys.removeEmojiEnable.id), (checked) => {
-        //         lsSetItem(lsKeys.removeEmojiEnable.id, checked);
-        //     }
-        // ));
-        getById(eleIds.danmakuChConverDiv, container).append(
-            embyTabs(danmakuChConverOpts, window.ede.chConvert, 'id', 'name', doDanmakuChConverChange)
-        );
-        getById(eleIds.danmakuEngineDiv, container).append(
-            embyTabs(danmakuEngineOpts, lsGetItem(lsKeys.engine.id), 'id', 'name', doDanmakuEngineSelect)
+        getById(eleIds.osdLineChartTimeDiv).append(
+            embySlider({ lsKey: lsKeys.osdLineChartTime, needReload: false }
+                , (val, opts) => { onSliderChange(val, opts);buildProgressBarChart(20); }, onSliderChangeLabel)
         );
     }
 
@@ -3118,11 +3154,12 @@
     function onSliderChange(val, opts) {
         onSliderChangeLabel(val, opts);
         if (opts.key && lsCheckSet(opts.key, val)) {
-            if (opts.needReload === undefined) {
-                opts.needReload = true;
+            let needReload = opts.needReload === undefined ? true : opts.needReload;
+            if (opts.isManual) {
+                needReload = false;
             }
-            console.log(`${opts.key} changed to ${val}, needReload: ${opts.needReload}`);
-            if (opts.needReload) {
+            console.log(`${opts.key} changed to ${val}, needReload: ${needReload}`);
+            if (needReload) {
                 changeFontStylePreview();
                 loadDanmaku(LOAD_TYPE.RELOAD);
             }
@@ -3444,7 +3481,7 @@
         // other EventListeners : 'beginediting'(every step), 'endediting'(end of tap/swipe)
         if (typeof onChange === 'function') {
             slider.addEventListener('change', e => {
-                opts.needReload = e.isInit ? false : undefined;
+                opts.isManual = e.isManual;
                 const nextEle = e.target.parentNode.nextElementSibling;
                 opts.labelEle = nextEle.children.length > 0 ? nextEle.children[0] : nextEle;
                 return onChange(e.target.value, opts);
@@ -3461,7 +3498,7 @@
             slider.setValue(options.value);
             waitForElement({ element: slider, needParent: true }, (ele) => {
                 const e = new Event('change');
-                e.isInit = true;
+                e.isManual = true;
                 slider.dispatchEvent(e);
             });
         }
@@ -3730,8 +3767,8 @@
         const clockElement = document.createElement('div');
         clockElement.id = 'headerClock';
         warpper.append(clockElement);
-    
-        const intervalId = setInterval(() => {
+
+        function updateClock() {
             const timeString = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             clockElement.textContent = timeString;
             // console.log(timeString);
@@ -3739,7 +3776,9 @@
             if (!headerClockEle) {
                 clearInterval(intervalId);
             }
-        }, 1000);
+        }
+        updateClock();
+        const intervalId = setInterval(updateClock, 1000);
     
         window.ede.destroyIntervalIds.push(intervalId);
         return intervalId;
