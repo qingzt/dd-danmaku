@@ -1079,7 +1079,6 @@
         let _comments = danmakuFilter(commentsParsed);
         console.log('弹幕加载成功: ' + _comments.length);
 
-        const _container = document.querySelector(mediaContainerQueryStr);
         const _media = document.querySelector(mediaQueryStr);
         if (!_media) {
             // this only working on quickDebug
@@ -1104,6 +1103,8 @@
         // wrapper.style.opacity = lsGetItem(lsKeys.fontOpacity.id); // 弹幕整体透明度
         wrapper.style.top = wrapperTop + 'px';
         wrapper.style.pointerEvents = 'none';
+        // const _container = document.querySelector(mediaContainerQueryStr);
+        const _container = await waitForElement(mediaContainerQueryStr);
         _container.prepend(wrapper);
         let _speed = 144 * lsGetItem(lsKeys.speed.id);
         window.ede.danmaku = new Danmaku({
@@ -3657,38 +3658,52 @@
      * @param {function} callback - 等待目标获取成功后的回调函数,参数为元素
      * @param {number} [timeout=10000] - 超时时间,默认10秒,0则不设置超时
      * @param {number} [interval=check_interval] - 检查间隔,默认200ms
-     * */
+     * @returns {Promise<HTMLElement|null>} - 返回一个 Promise 对象:
+     *   - 如果目标元素在超时时间内被找到,Promise 将 resolve 为目标元素 (HTMLElement)
+     *   - 如果超时且未找到目标元素,Promise 将 reject 为一个 Error 对象,表示查找失败
+    */
     function waitForElement(target, callback, timeout = 10000, interval = check_interval) {
         let intervalId = null;
         let timeoutId = null;
         const isSelector = typeof target === 'string';
         const elementMark = isSelector ? target : target.element.tagName;
-        function checkElement() {
-            console.log(`waitForElement: checking element[${elementMark}]`);
-            let element = null;
-            if (isSelector) {
-                element = document.querySelector(target);
-            } else {
-                if (target.needParent) {
-                    element = target.element.parentNode;
+    
+        const promise = new Promise((resolve, reject) => {
+            function checkElement() {
+                console.log(`waitForElement: checking element[${elementMark}]`);
+                let element = null;
+                if (isSelector) {
+                    element = document.querySelector(target);
                 } else {
-                    element = target.element;
+                    if (target.needParent) {
+                        element = target.element.parentNode;
+                    } else {
+                        element = target.element;
+                    }
+                }
+                if (element) {
+                    clearInterval(intervalId);
+                    clearTimeout(timeoutId);
+                    if (callback) {
+                        callback(element);
+                    }
+                    resolve(element);
                 }
             }
-            if (element) {
-                clearInterval(intervalId);
-                clearTimeout(timeoutId);
-                callback(element);
+    
+            intervalId = setInterval(checkElement, interval);
+            window.ede.destroyIntervalIds.push(intervalId);
+    
+            if (timeout > 0) {
+                timeoutId = setTimeout(() => {
+                    clearInterval(intervalId);
+                    console.log(`waitForElement: unable to find element[${elementMark}], timeout: ${timeout}`);
+                    reject(new Error(`Element [${elementMark}] not found within ${timeout}ms`));
+                }, timeout);
             }
-        }
-        intervalId = setInterval(checkElement, interval);
-        window.ede.destroyIntervalIds.push(intervalId);
-        if (timeout > 0) {
-            timeoutId = setTimeout(() => {
-                clearInterval(intervalId);
-                console.log(`waitForElement: unable to find element[${elementMark}], timeout: ${timeout}`);
-            }, timeout);
-        }
+        });
+    
+        return promise;
     }
 
     function addEasterEggListener() {
@@ -3796,7 +3811,7 @@
         });
     }
 
-    function initH5VideoAdapter() {
+    async function initH5VideoAdapter() {
         let _media = document.querySelector(mediaQueryStr);
         if (_media) {
             if (_media.id) { // 若是手动创建的<video>
@@ -3871,7 +3886,10 @@
         if (danmakuCtr) {
             danmakuCtr.remove();
         }
-        // getById(eleIds.h5VideoAdapter).remove();
+        // const h5VideoAdapterEle = getById(eleIds.h5VideoAdapter);
+        // if (h5VideoAdapterEle) {
+        //     h5VideoAdapterEle.remove();
+        // }
         // 销毁平滑补充 timeupdate 定时器
         videoTimeUpdateInterval(null, false);
         // 销毁可能残留的定时器
