@@ -241,6 +241,7 @@
         debugDialogWindow: { id: 'danmakuDebugDialogWindow', defaultValue: false, name: '弹窗窗口化' },
         debugDialogRight: { id: 'danmakuDebugDialogRight', defaultValue: false, name: '弹窗靠右布局' }, // Emby Android 上暂时存在 bug
         debugTabIframeEnable: { id: 'danmakuDebugTabIframeEnable', defaultValue: false, name: '打开内嵌网页' },
+        debugH5VideoAdapterEnable: { id: 'danmakuDebugH5VideoAdapterEnable', defaultValue: false, name: '查看视频适配器情况' },
         quickDebugOn: { id: 'danmakuQuickDebugOn', defaultValue: false, name: '快速调试' },
         customeCorsProxyUrl: { id: 'danmakuCustomeCorsProxyUrl', defaultValue: corsProxy, name: '跨域代理前缀' },
         customeDanmakuUrl: { id: 'danmakuCustomeDanmakuUrl', defaultValue: requireDanmakuPath, name: '弹幕引擎依赖' },
@@ -2736,33 +2737,39 @@
 
     function buildDebugCheckbox(container) {
         const debugWrapper = getById(eleIds.debugCheckbox, container);
-        debugWrapper.append(embyCheckbox({ label: lsKeys.debugShowDanmakuWrapper.name }, lsGetItem(lsKeys.debugShowDanmakuWrapper.id), (checked) => {
-            lsSetItem(lsKeys.debugShowDanmakuWrapper.id, checked);
-            const wrapper = getById(eleIds.danmakuWrapper);
-            wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
-            if (!checked) { return; }
-            console.log(`弹幕容器(#${eleIds.danmakuWrapper})宽高像素:`, wrapper.offsetWidth, wrapper.offsetHeight);
-            const stage = wrapper.firstChild;
-            console.log(`实际舞台(${stage.tagName})宽高像素:`, stage.offsetWidth, stage.offsetHeight);
-        }));
-        debugWrapper.append(embyCheckbox({ label: lsKeys.debugShowDanmakuCtrWrapper.name }, lsGetItem(lsKeys.debugShowDanmakuCtrWrapper.id), (checked) => {
-            lsSetItem(lsKeys.debugShowDanmakuCtrWrapper.id, checked);
-            const wrapper = getById(eleIds.danmakuCtr);
-            wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
-            if (!checked) { return; }
-            console.log(`按钮容器(#${eleIds.danmakuCtr})宽高像素:`, wrapper.offsetWidth, wrapper.offsetHeight);
-        }));
-        debugWrapper.append(embyCheckbox({ label: lsKeys.debugReverseDanmu.name }, lsGetItem(lsKeys.debugReverseDanmu.id), (checked) => {
-            lsSetItem(lsKeys.debugReverseDanmu.id, checked);
-            const comments = window.ede.danmuCache[window.ede.episode_info.episodeId];
-            comments.map(c => {
-                const values = c.p.split(',');
-                values[1]= { '6': '1', '1': '6', '5': '4', '4': '5' }[values[1]];
-                c.p = values.join();
-            });
-            console.log('已' + lsKeys.debugReverseDanmu.name);
-            createDanmaku(comments);
-        }));
+        debugWrapper.append(embyCheckbox({ label: lsKeys.debugShowDanmakuWrapper.name }
+            , lsGetItem(lsKeys.debugShowDanmakuWrapper.id), (checked) => {
+                lsSetItem(lsKeys.debugShowDanmakuWrapper.id, checked);
+                const wrapper = getById(eleIds.danmakuWrapper);
+                wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
+                if (!checked) { return; }
+                console.log(`弹幕容器(#${eleIds.danmakuWrapper})宽高像素:`, wrapper.offsetWidth, wrapper.offsetHeight);
+                const stage = wrapper.firstChild;
+                console.log(`实际舞台(${stage.tagName})宽高像素:`, stage.offsetWidth, stage.offsetHeight);
+            }
+        ));
+        debugWrapper.append(embyCheckbox({ label: lsKeys.debugShowDanmakuCtrWrapper.name }
+            , lsGetItem(lsKeys.debugShowDanmakuCtrWrapper.id), (checked) => {
+                lsSetItem(lsKeys.debugShowDanmakuCtrWrapper.id, checked);
+                const wrapper = getById(eleIds.danmakuCtr);
+                wrapper.style.backgroundColor = checked ? styles.colors.highlight : '';
+                if (!checked) { return; }
+                console.log(`按钮容器(#${eleIds.danmakuCtr})宽高像素:`, wrapper.offsetWidth, wrapper.offsetHeight);
+            }
+        ));
+        debugWrapper.append(embyCheckbox({ label: lsKeys.debugReverseDanmu.name }
+            , lsGetItem(lsKeys.debugReverseDanmu.id), (checked) => {
+                lsSetItem(lsKeys.debugReverseDanmu.id, checked);
+                const comments = window.ede.danmuCache[window.ede.episode_info.episodeId];
+                comments.map(c => {
+                    const values = c.p.split(',');
+                    values[1]= { '6': '1', '1': '6', '5': '4', '4': '5' }[values[1]];
+                    c.p = values.join();
+                });
+                console.log('已' + lsKeys.debugReverseDanmu.name);
+                createDanmaku(comments);
+            }
+        ));
         const toggleDanmuColor = (checked, lsKey, colorFn) => {
             lsSetItem(lsKey.id, checked);
             let comments = window.ede.danmuCache[window.ede.episode_info.episodeId];
@@ -2781,14 +2788,18 @@
             }
             createDanmaku(comments);
         };
-        debugWrapper.append(embyCheckbox({ label: lsKeys.debugRandomDanmuColor.name }, lsGetItem(lsKeys.debugRandomDanmuColor.id), (checked) => {
-            toggleDanmuColor(checked, lsKeys.debugRandomDanmuColor
-                , () => parseInt(Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), 16));
-        }));
-        debugWrapper.append(embyCheckbox({ label: lsKeys.debugForceDanmuWhite.name }, lsGetItem(lsKeys.debugForceDanmuWhite.id), (checked) => {
-            toggleDanmuColor(checked, lsKeys.debugForceDanmuWhite
-                , () => parseInt(styles.colors.info.toString(16).padStart(6, '0'), 16));
-        }));
+        debugWrapper.append(embyCheckbox({ label: lsKeys.debugRandomDanmuColor.name }
+            , lsGetItem(lsKeys.debugRandomDanmuColor.id), (checked) => {
+                toggleDanmuColor(checked, lsKeys.debugRandomDanmuColor
+                    , () => parseInt(Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'), 16));
+            }
+        ));
+        debugWrapper.append(embyCheckbox({ label: lsKeys.debugForceDanmuWhite.name }
+            , lsGetItem(lsKeys.debugForceDanmuWhite.id), (checked) => {
+                toggleDanmuColor(checked, lsKeys.debugForceDanmuWhite
+                    , () => parseInt(styles.colors.info.toString(16).padStart(6, '0'), 16));
+            }
+        ));
         // debugWrapper.append(embyCheckbox({ label: lsKeys.debugGenerateLarge.name }, lsGetItem(lsKeys.debugGenerateLarge.id), (checked) => {
         //     lsSetItem(lsKeys.debugGenerateLarge.id, checked);
         //     let intervalId;
@@ -2860,6 +2871,17 @@
                 , lsGetItem(lsKeys.debugTabIframeEnable.id), (checked) => {
                     lsSetItem(lsKeys.debugTabIframeEnable.id, checked);
                     getById(tabIframeId + 'Btn').style.display = checked ? '' : 'none';
+                }
+            ));
+        }
+        // lsKeys.debugH5VideoAdapterEnable
+        const h5VideoAdapter = getById(eleIds.h5VideoAdapter);
+        if (h5VideoAdapter) {
+            debugWrapper.append(embyCheckbox({ label: lsKeys.debugH5VideoAdapterEnable.name }
+                , lsGetItem(lsKeys.debugH5VideoAdapterEnable.id), (checked) => {
+                    lsSetItem(lsKeys.debugH5VideoAdapterEnable.id, checked);
+                    h5VideoAdapter.style.display = checked ? '' : 'none';
+                    h5VideoAdapter.style.backgroundColor = checked ? styles.colors.highlight : '';
                 }
             ));
         }
@@ -3900,6 +3922,9 @@
                     if (Math.abs(mediaTime - realCurrentTime) > 2) {
                         _media.dispatchEvent(new Event('seeking'));
                         console.warn('seeking', realCurrentTime, mediaTime);
+                    }
+                    if (lsGetItem(lsKeys.debugH5VideoAdapterEnable.id)) {
+                        console.warn(`${eleIds.h5VideoAdapter}, currentTime: ${_media.currentTime}, playbackRate: ${_media.playbackRate}`);
                     }
                 },
             });
