@@ -44,7 +44,8 @@
         accessTokenUrl: 'https://next.bgm.tv/demo/access-token',
         getCharacters: (subjectId) => `${bangumiApi.prefix}/subjects/${subjectId}/characters`,
         // need auth
-        getMyself: () => `${bangumiApi.prefix}/me`,
+        getMe: () => `${bangumiApi.prefix}/me`,
+        getUserCollection: (userName, subjectId) => `${bangumiApi.prefix}/users/${userName}/collections/${subjectId}`,
         postUserCollection: (subjectId) => `${bangumiApi.prefix}/users/-/collections/${subjectId}`,
         getUserSubjectEpisodeCollection: (subjectId) => `${bangumiApi.prefix}/users/-/collections/${subjectId}/episodes?offset=0&limit=100`,
         putUserEpisodeCollection: (episodeId ) => `${bangumiApi.prefix}/users/-/collections/-/episodes/${episodeId}`,
@@ -246,6 +247,13 @@
         customeGetCommentUrl: { id: 'danmakuCustomeGetCommentUrl', defaultValue: getApiTl(dandanplayApi.getComment), name: '获取指定弹幕库的所有弹幕' },
         customeGetExtcommentUrl: { id: 'danmakuCustomeGetExtcommentUrl', defaultValue: getApiTl(dandanplayApi.getExtcomment), name: '获取指定第三方url的弹幕' },
         customePosterImgUrl: { id: 'danmakuCustomePosterImgUrl', defaultValue: getApiTl(dandanplayApi.posterImg), name: '媒体海报' },
+    };
+    const lsLocalKeys = {
+        animePrefix: '_anime_id_rel_',
+        animeSeasonPrefix: '_anime_season_rel_',
+        animeEpisodePrefix: '_episode_id_rel_',
+        bangumiEpInfoPrefix: '_bangumi_episode_id_rel_',
+        bangumiMe: '_bangumi_me',
     };
     const eleIds = {
         danmakuSwitchBtn: 'danmakuSwitchBtn',
@@ -585,33 +593,41 @@
         }
         if (_media.getAttribute('ede_listening')) { return; }
         console.log('正在初始化Listener');
-        playbackEventsOn({ 'playbackstart': (e, state) => {
-            console.log(e.type);
-            loadDanmaku(LOAD_TYPE.INIT);
-        }});
-        playbackEventsOn({ 'playbackstop': (e, state) => {
-            console.log(e.type);
-            onPlaybackStop(e, state);
-            removeHeaderClock();
-            danmakuAutoFilterCancel();
-        } });
+        playbackEventsRefresh({ 'playbackstart': onPlaybackStart });
+        playbackEventsRefresh({ 'playbackstop': onPlaybackStop });
         _media.setAttribute('ede_listening', true);
-        document.addEventListener('video-osd-show', (e) => {
-            console.log(e.type, e);
-            if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
-                buildProgressBarChart(20);
-            }
-            addHeaderClock();
-        });
-        document.addEventListener('video-osd-hide', (e) => {
-            console.log(e.type, e);
-            removeHeaderClock();
-        });
+        refreshEventListener({ 'video-osd-show': onVideoOsdShow });
+        refreshEventListener({ 'video-osd-hide': onVideoOsdHide });
         console.log('Listener初始化完成');
         if (OS.isAndroidEmbyNoisyX()) {
             console.log('检测为安卓小秘版,首次播放未触发 playbackstart 事件,手动初始化弹幕环境');
             loadDanmaku(LOAD_TYPE.INIT);
         }
+    }
+
+    function onPlaybackStart(e, state) {
+        console.log(e.type);
+        loadDanmaku(LOAD_TYPE.INIT);
+    }
+
+    function onPlaybackStop(e, state) {
+        console.log(e.type);
+        onPlaybackStopPct(e, state);
+        removeHeaderClock();
+        danmakuAutoFilterCancel();
+    }
+
+    function onVideoOsdShow(e) {
+        console.log(e.type, e);
+        if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
+            buildProgressBarChart(20);
+        }
+        addHeaderClock();
+    }
+
+    function onVideoOsdHide(e) {
+        console.log(e.type, e);
+        removeHeaderClock();
     }
 
     function initUI() {
@@ -713,7 +729,7 @@
         return extComments;
     }
 
-    function onPlaybackStop(e, state) {
+    function onPlaybackStopPct(e, state) {
         if (!state.NowPlayingItem) { return console.log('跳过 Web 端自身错误触发的第二次播放停止事件'); }
         console.log(e.type);
         const positionTicks = state.PlayState.PositionTicks;
@@ -741,7 +757,7 @@
 
     async function getEpisodeBangumiRel() {
         const episode_info = window.ede.episode_info;
-        const _bangumi_key = `_bangumi_episode_id_rel_${episode_info.episodeId}`;
+        const _bangumi_key = lsLocalKeys.bangumiEpInfoPrefix + episode_info.episodeId;
         let bangumiInfoLs = localStorage.getItem(_bangumi_key);
         if (bangumiInfoLs) {
             bangumiInfoLs = JSON.parse(bangumiInfoLs);
@@ -783,6 +799,20 @@
         const bangumiInfo = await getEpisodeBangumiRel();
         const { subjectId, bgmEpisodeIndex, } = bangumiInfo;
         const episodeIndex = bgmEpisodeIndex ? bgmEpisodeIndex : bangumiInfo.episodeIndex;
+        console.log('准备校验 Bangumi 条目收藏状态是否为看过');
+        let bangumiMe = localStorage.getItem(lsLocalKeys.bangumiMe);
+        if (bangumiMe) {
+            bangumiMe = JSON.parse(bangumiMe);
+        } else {
+            bangumiMe = await fetchBangumiApiGetMe(token);
+        }
+        let msg = '';
+        const bangumiUserColl = await fetchJson(bangumiApi.getUserCollection(bangumiMe.username, subjectId), { token });
+        if (bangumiUserColl.type === 2) { // 看过状态
+            msg = 'Bangumi 条目已为看过状态,跳过更新';
+            console.log(msg, bangumiUserColl);
+            throw new Error(msg);
+        }
         console.log('准备修改 Bangumi 条目收藏状态为在看, 如果不存在则创建, 如果存在则修改');
         let body = { type: 3 }; // 在看状态
         await fetchJson(bangumiApi.postUserCollection(subjectId), { token, body });
@@ -797,8 +827,9 @@
         const bangumiEpColl = bangumiInfo.bangumiEpsRes.data[episodeIndex];
         const bangumiEp = bangumiEpColl.episode;
         if (bangumiEpColl.type === 2) {
-            console.log('Bangumi 已是看过状态,跳过更新', bangumiEp);
-            throw new Error('Bangumi 已是看过状态,跳过更新');
+            msg = 'Bangumi 章节收藏已是看过状态,跳过更新';
+            console.log(msg, bangumiEp);
+            throw new Error(msg);
         }
         console.log('准备更新 Bangumi 章节收藏状态, 详情: ', bangumiEp);
         body.type = 2; // 看过状态
@@ -880,9 +911,9 @@
             animeName = item.Name;
             episode = 'movie';
         }
-        let _id_key = '_anime_id_rel_' + _id;
-        let _season_key = '_anime_season_rel_' + _id;
-        let _episode_key = '_episode_id_rel_' + _id + '_' + episode;
+        let _id_key = lsLocalKeys.animePrefix + _id;
+        let _season_key = lsLocalKeys.animeSeasonPrefix + _id;
+        let _episode_key = lsLocalKeys.animeEpisodePrefix + _id + '_' + episode;
         if (window.localStorage.getItem(_id_key)) {
             animeId = window.localStorage.getItem(_id_key);
         }
@@ -2594,15 +2625,26 @@
         const bangumiToken = getById(eleIds.bangumiTokenInput).value.trim();
         lsSetItem(lsKeys.bangumiToken.id, bangumiToken);
         const label = getById(eleIds.bangumiTokenLabel);
-        fetchJson(bangumiApi.getMyself(), { token: bangumiToken }).then(res => {
+        fetchBangumiApiGetMe(bangumiToken).then(res => {
             label.innerText = 'Bangumi Token 验证成功';
             label.style.color = 'green';
-            console.log('bangumiApi.getMyself()', res);
         }).catch(error => {
             label.innerText = 'Bangumi Token 验证失败';
             label.style.color = 'red';
             throw error;
         });
+    }
+
+    async function fetchBangumiApiGetMe(bangumiToken) {
+        try {
+            const res = await fetchJson(bangumiApi.getMe(), { token: bangumiToken });
+            console.log('Bangumi Token 验证成功', res);
+            localStorage.setItem(lsLocalKeys.bangumiMe, JSON.stringify(res));
+            return res;
+        } catch (error) {
+            console.error('Bangumi Token 验证失败', error);
+            throw error;
+        }
     }
 
     function buildCustomUrlSetting(container) {
@@ -2852,7 +2894,7 @@
             }
         }));
         debugWrapper.append(embyButton({ label: '清空章节引用缓存', class: classes.embyButtons.submit, style: 'margin: 0.3em;' }, () => {
-            lsBatchRemove(['_episode_id_rel_', '_bangumi_episode_id_rel_']);
+            lsBatchRemove([lsLocalKeys.animeEpisodePrefix, lsLocalKeys.bangumiEpInfoPrefix]);
             console.log('已清空章节引用缓存');
             embyToast({ text: '已清空章节引用缓存' });
         }));
@@ -3799,8 +3841,20 @@
         return intervalId;
     }
 
-    // from emby videoosd.js bindToPlayer events, warning: not dom event
-    async function playbackEventsOn(eventsMap) {
+    function refreshEventListener(eventsMap) {
+        objectEntries(eventsMap).forEach(([eventName, fn]) => {
+            document.removeEventListener(eventName, fn);
+            document.addEventListener(eventName, fn);
+        });
+    }
+
+    /**
+     * 添加事件并先移除事件
+     * from emby videoosd.js bindToPlayer events, warning: not dom event
+     * @param {Object} eventsMap { eventName: fn } fn 请勿使用匿名函数,off 时无法移除事件
+     * @returns null
+     */
+    async function playbackEventsRefresh(eventsMap) {
         const [playbackManager, events] = await require(['playbackManager', 'events']);
         const player = playbackManager.getCurrentPlayer();
         if (!player) { return; }
@@ -3831,8 +3885,9 @@
         _media.play();
         videoTimeUpdateInterval(_media, true);
 
+        // 以下暂未遇到匿名函数导致的事件重复,等出现时再匿名转命名函数
         require(['playbackManager'], (playbackManager) => {
-            playbackEventsOn({
+            playbackEventsRefresh({
                 'timeupdate': (e) => {
                     // conver to seconds from Ticks
                     const realCurrentTime = playbackManager.currentTime(playbackManager.getCurrentPlayer()) / 1e7;
@@ -3849,7 +3904,7 @@
                 },
             });
         });
-        playbackEventsOn({
+        playbackEventsRefresh({
             'pause': (e) => {
                 console.warn(e.type);
                 _media.dispatchEvent(new Event('pause'));
@@ -3876,7 +3931,10 @@
         }
     }
 
-    function beforeDestroy() {
+    function beforeDestroy(e) {
+        if (e.detail.type !== 'video-osd') {
+            return;
+        }
         // 此段销毁不重要,可有可无,仅是规范使用,清除弹幕,但未销毁 danmaku 实例
         if (window.ede.danmaku) {
             window.ede.danmaku.clear();
@@ -3898,8 +3956,7 @@
         lsSetItem(lsKeys.timelineOffset.id, lsKeys.timelineOffset.defaultValue);
     }
 
-    // emby/jellyfin CustomEvent. see: https://github.com/MediaBrowser/emby-web-defaultskin/blob/822273018b82a4c63c2df7618020fb837656868d/nowplaying/videoosd.js#L698
-    document.addEventListener('viewshow', function (e) {
+    function onViewShow(e) {
         console.log(e.type, e);
         customeUrl.init();
         lsGetItem(lsKeys.quickDebugOn.id) && !getById(eleIds.danmakuSettingBtnDebug) && quickDebug();
@@ -3916,7 +3973,10 @@
             initCss();
         }
         window.ede.itemId = e.detail.params.id ? e.detail.params.id : '';
-    });
-    document.addEventListener('viewbeforehide', e => e.detail.type === 'video-osd' && beforeDestroy());
+    }
+
+    // emby/jellyfin CustomEvent. see: https://github.com/MediaBrowser/emby-web-defaultskin/blob/822273018b82a4c63c2df7618020fb837656868d/nowplaying/videoosd.js#L698
+    refreshEventListener({ 'viewshow': onViewShow });
+    refreshEventListener({ 'viewbeforehide': beforeDestroy });
 
 })();
