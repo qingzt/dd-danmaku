@@ -611,13 +611,11 @@
 
     function onPlaybackStart(e, state) {
         console.log(e.type);
-        embyToast({ text: `播放开始事件`});
         loadDanmaku(LOAD_TYPE.INIT);
     }
 
     function onPlaybackStop(e, state) {
         console.log(e.type);
-        embyToast({ text: `播放停止事件`});
         onPlaybackStopPct(e, state);
         removeHeaderClock();
         danmakuAutoFilterCancel();
@@ -625,7 +623,6 @@
 
     function onVideoOsdShow(e) {
         console.log(e.type, e);
-        embyToast({ text: `onVideoOsdShow`});
         if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
             buildProgressBarChart(20);
         }
@@ -1937,20 +1934,6 @@
             { family: 'KaiTi', fullName: '楷体' },
             { family: 'Microsoft YaHei', fullName: '微软雅黑' },
         ];
-        if ('queryLocalFonts' in window) {
-            queryLocalFonts().then(fonts => {
-                availableFonts = [...availableFonts, ...fonts].reduce((acc, font) => {
-                    if (!acc.some(f => f.family === font.family)) acc.push(font);
-                    return acc;
-                }, []);
-                const selectedIndex = availableFonts.findIndex(f => f.family === fontFamilyVal);
-                resetFontFamilyDiv(selectedIndex, availableFonts);
-            }).catch(err => {
-                console.error(err);
-            });
-        } else {
-            console.info('queryLocalFonts 高级查询 API 不可用,使用预定字体列表');
-        }
         const selectedIndex = availableFonts.findIndex(f => f.family === fontFamilyVal);
         resetFontFamilyDiv(selectedIndex, availableFonts);
         buildFontFamilyCtrl();
@@ -1997,6 +1980,22 @@
                         const labelVal = option.family !== option.fullName ? option.fullName : '';
                         onSliderChangeLabel(labelVal, { labelId: eleIds.fontFamilyLabel });
                         loadDanmaku(LOAD_TYPE.RELOAD);
+                    }
+                }, (e) => {
+                    if ('queryLocalFonts' in window && opts.length <= 6) {
+                        queryLocalFonts().then(fonts => {
+                            opts = [...opts, ...fonts].reduce((acc, font) => {
+                                if (!acc.some(f => f.family === font.family)) acc.push(font);
+                                return acc;
+                            }, []);
+                            const fontFamilyVal = lsGetItem(lsKeys.fontFamily.id);
+                            const selectedIndex = opts.findIndex(f => f.family === fontFamilyVal);
+                            resetFontFamilyDiv(selectedIndex, opts);
+                        }).catch(err => {
+                            console.error(err);
+                        });
+                    } else {
+                        console.info('queryLocalFonts 高级查询 API 不可用,使用预定字体列表');
                     }
                 })
         );
@@ -3429,7 +3428,7 @@
         return tabs;
     }
 
-    function embySelect(props, selectedIndexOrValue, options, optionValueKey, optionTitleKey, onChange) {
+    function embySelect(props, selectedIndexOrValue, options, optionValueKey, optionTitleKey, onChange, onFocus) {
         const defaultProps = { class: 'emby-select' };
         props = { ...defaultProps, ...props };
         if (!Number.isInteger(selectedIndexOrValue)) {
@@ -3460,6 +3459,9 @@
             selectElement.addEventListener('change', e => {
                 onChange(e.target.value, e.target.selectedIndex, options[e.target.selectedIndex]);
             });
+        }
+        if (typeof onFocus === 'function') {
+            selectElement.addEventListener('focus', onFocus);
         }
         // return selectElement;
         // !!! important, only emby-select must have selectLabel class wrapper
