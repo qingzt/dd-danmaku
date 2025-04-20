@@ -1997,8 +1997,7 @@
                         }).catch(err => {
                             console.error(err);
                         });
-                    } else {
-                        console.info('queryLocalFonts 高级查询 API 不可用,使用预定字体列表');
+                        console.info('queryLocalFonts 高级查询 API 可用,已补充字体列表');
                     }
                 })
         );
