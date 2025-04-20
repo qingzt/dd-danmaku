@@ -18,19 +18,19 @@
 
 1. 直接下载`ede.js`到 index.html 同级目录下,优先使用本地文件较为稳定
 ```js
-// <script src="ede.js" defer></script>
-<script src="ede.js"></script>
+// <script src="ede.js" charset="utf-8" defer></script>
+<script src="ede.js" charset="utf-8"></script>
 ```
 
 2. 使用 jsdelivr CDN 网络地址
 ```js
-// <script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.user.js" defer></script>
-<script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.user.js"></script>
+// <script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.user.js" charset="utf-8" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.user.js" charset="utf-8"></script>
 ```
 或
 ```js
-// <script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.min.js"></script>
+// <script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.min.js" charset="utf-8" defer></script>
+<script src="https://cdn.jsdelivr.net/gh/chen3861229/dd-danmaku@gh-pages/ede.min.js" charset="utf-8"></script>
 ```
 
 3. 不建议再使用`Cloudflare Pages`托管的`js`文件,被强制隐去了`Content-Length`响应头会导致客户端开屏闪退
@@ -57,13 +57,13 @@ windows 下载 JDK 可使用[Apktool](https://apktool.org) 进行解包和打包
 
 #### 哪些客户端可以修改?
 
-1. 只有 Emby for Android, Emby for iOS, Emby Theater(Windows and MacOS) 这几个官方客户端存在 Electron/Web 环境才可以修改
+1. 只有 Emby for Android, Emby for iOS, Emby Theater(Windows and MacOS), Emby UWP 这几个官方客户端存在 Web 环境才可以修改
 
 2. 老 TV 客户端 Emby for Android TV_XXXg 以版本号以 g 结尾的无法修改,是原生 Kotlin 代码,不存在 web 环境,包括其他第三方播放器客户端更加没办法修改了
 
 ### 四.使用第三方用户脚本加载器(推荐)
 
-优点为属于 emby 插件,也可添加其它类型脚本并快捷管理,但同样需要服务端与客户端配合使用[CustomCssJS](https://github.com/Shurelol/Emby.CustomCssJS),服务端改一次,客户端修改集成可手动参考三,不想自己改的可直接使用第三方魔改增强版已内置 **CustomCssJS** 集成的即可,缺点为无 iOS 端的已修改版
+优点为属于 emby 插件,也可添加其它类型脚本并快捷管理,但同样需要服务端与客户端配合使用[CustomCssJS](https://github.com/Shurelol/Emby.CustomCssJS),服务端改一次,客户端修改集成可手动参考三,不想自己改的可直接使用第三方魔改增强版已内置 **CustomCssJS** 集成的即可,缺点为无 iOS 端的已修改版,注意**Emby UWP**暂不兼容
 
 ## 界面
 

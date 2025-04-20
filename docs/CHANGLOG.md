@@ -1,4 +1,11 @@
-#### 2.0.0 待发布
+#### 1.47 待发布
+
+#### 1.46
+fix: 修复 Windows UWP 版的首次播放弹幕不加载问题
+fix: 懒加载 queryLocalFonts 以优化 UWP 版每次的权限弹窗
+fix: 修复推送 bangumi 条目未收藏问题
+fix: 修复 fontStyle 值问题
+docs: 归档测试代码
 
 #### 1.45
 feat: 设置项更名,弹幕高能进度条,提供免过滤,颗粒度调整
