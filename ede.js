@@ -456,6 +456,7 @@
         }
         return [];
     }
+    let browser = null;
     const OS = {
         isAndroid: () => /android/i.test(navigator.userAgent),
         isIOS: () => /iPad|iPhone|iPod/i.test(navigator.userAgent),
@@ -466,6 +467,8 @@
         isUbuntu: () => /Ubuntu/i.test(navigator.userAgent),
         isAndroidEmbyNoisyX: () => OS.isAndroid() && ApiClient.appVersion().includes('-'),
         isEmbyNoisyX: () => ApiClient.appVersion().includes('-'),
+        isEmbyTheater: () => browser.windows && browser.electron,
+        isEmbyUWP: () => browser.windows && !browser.electron,
         isOthers: () => objectEntries(OS).filter(([key, val]) => key !== 'isOthers').every(([key, val]) => !val()),
     };
     const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F1E6}-\u{1F1FF}]/gu;
@@ -600,19 +603,21 @@
         refreshEventListener({ 'video-osd-show': onVideoOsdShow });
         refreshEventListener({ 'video-osd-hide': onVideoOsdHide });
         console.log('Listener初始化完成');
-        if (OS.isAndroidEmbyNoisyX()) {
-            console.log('检测为安卓小秘版,首次播放未触发 playbackstart 事件,手动初始化弹幕环境');
+        if (OS.isAndroidEmbyNoisyX() || OS.isEmbyUWP()) {
+            console.log('检测为特定平台版(安卓小秘版或UWP版),首次播放未触发 playbackstart 事件,手动初始化弹幕环境');
             loadDanmaku(LOAD_TYPE.INIT);
         }
     }
 
     function onPlaybackStart(e, state) {
         console.log(e.type);
+        embyToast({ text: `播放开始事件`});
         loadDanmaku(LOAD_TYPE.INIT);
     }
 
     function onPlaybackStop(e, state) {
         console.log(e.type);
+        embyToast({ text: `播放停止事件`});
         onPlaybackStopPct(e, state);
         removeHeaderClock();
         danmakuAutoFilterCancel();
@@ -620,6 +625,7 @@
 
     function onVideoOsdShow(e) {
         console.log(e.type, e);
+        embyToast({ text: `onVideoOsdShow`});
         if (lsGetItem(lsKeys.osdLineChartEnable.id)) {
             buildProgressBarChart(20);
         }
@@ -4003,6 +4009,9 @@
             initCss();
         }
         window.ede.itemId = e.detail.params.id ? e.detail.params.id : '';
+        require(['browser'], (b) => {
+            browser = b;
+        });
     }
 
     // emby/jellyfin CustomEvent. see: https://github.com/MediaBrowser/emby-web-defaultskin/blob/822273018b82a4c63c2df7618020fb837656868d/nowplaying/videoosd.js#L698
