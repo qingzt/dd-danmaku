@@ -1601,7 +1601,8 @@
             );
         }
         const fontWeight = lsGetItem(lsKeys.fontWeight.id);
-        const fontStyle = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)].id;
+        // const fontStyle = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)].id;
+        const fontStyle = lsGetItem(lsKeys.fontStyle.id);
         const fontFamily = lsGetItem(lsKeys.fontFamily.id);
         // 弹幕透明度
         const fontOpacity = Math.round(lsGetItem(lsKeys.fontOpacity.id) * 255).toString(16).padStart(2, '0');
@@ -1802,7 +1803,7 @@
                             <div style="${styles.embySlider}">
                                 <label class="${classes.embyLabel}" style="width: 5em;">${lsKeys.fontStyle.name}: </label>
                                 <div id="${eleIds.danmakuFontStyleDiv}" style="width: 15.5em; text-align: center;"></div>
-                                <label style="${styles.embySliderLabel}">正常</label>
+                                <label style="${styles.embySliderLabel}">normal</label>
                             </div>
                             <div id="${eleIds.fontFamilyCtrl}" style="margin: 0.6em 0;"></div>
                             <div style="${styles.embySlider}">
@@ -1918,8 +1919,10 @@
         );
         getById(eleIds.danmakuFontStyleDiv).append(
             embySlider({ lsKey: lsKeys.fontStyle }
-            , (val, opts) => onSliderChange(styles.fontStyles[val].name, opts)
-            , (val, opts) => onSliderChangeLabel(styles.fontStyles[val].name, opts))
+            , (val, opts) => onSliderChange(styles.fontStyles[val].id, opts)
+            , (val, opts) => onSliderChangeLabel(styles.fontStyles[val].id, opts))
+            // , (val, opts) => onSliderChange(styles.fontStyles[val].name, opts)
+            // , (val, opts) => onSliderChangeLabel(styles.fontStyles[val].name, opts))
         );
         buildFontFamilySetting();
     }
@@ -2042,7 +2045,8 @@
     function changeFontStylePreview() {
         const fontStylePreview = getById(eleIds.fontStylePreview);
         const fontWeight = lsGetItem(lsKeys.fontWeight.id);
-        const fontStyle = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)].id;
+        // const fontStyle = styles.fontStyles[lsGetItem(lsKeys.fontStyle.id)].id;
+        const fontStyle = lsGetItem(lsKeys.fontStyle.id);
         const fontFamily = lsGetItem(lsKeys.fontFamily.id);
         const fontOpacity = Math.round(lsGetItem(lsKeys.fontOpacity.id) * 255).toString(16).padStart(2, '0');
         const baseColor = Number(styles.colors.info).toString(16).padStart(6, '0');
