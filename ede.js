@@ -35,7 +35,7 @@
     const dandanplayApi = {
         name: '弹弹play主接口',
         prefix: corsProxy + 'https://api.dandanplay.net/api/v2',
-        getSearchEpisodes: (anime, episode, tmdbId) => `${dandanplayApi.prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+        getSearchEpisodes: (anime, episode, tmdbId) => `${dandanplayApi.prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
         getComment: (episodeId, chConvert) => `${dandanplayApi.prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
         getExtcomment: (url) => `${dandanplayApi.prefix}/extcomment?url=${encodeURI(url)}`,
         getBangumi: (animeId) => `${dandanplayApi.prefix}/bangumi/${animeId}`,
@@ -705,7 +705,7 @@
             name: stored.name,
             prefix: stored.prefix,
             getSearchEpisodes: (anime, episode, tmdbId) => 
-                `${stored.prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+                `${stored.prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
             getComment: (episodeId, chConvert) => 
                 `${stored.prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
             getExtcomment: (url) => 
@@ -735,7 +735,7 @@
             name: name,
             prefix: prefix,
             getSearchEpisodes: (anime, episode, tmdbId) => 
-                `${prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+                `${prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
             getComment: (episodeId, chConvert) => 
                 `${prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
             getExtcomment: (url) => 
@@ -1169,7 +1169,7 @@
             animeId: animaInfo.animes[selectAnime_id].animeId,
             animeTitle: animaInfo.animes[selectAnime_id].animeTitle,
             animeOriginalTitle,
-            apiSource: apiSource ? { name: apiSource.name, prefix: apiSource.prefix } : null,
+            apiSource: apiSource && apiSource.name && apiSource.prefix ? { name: apiSource.name, prefix: apiSource.prefix } : null,
         };
         localStorage.setItem(_episode_key, JSON.stringify(episodeInfo));
         return episodeInfo;
@@ -3435,7 +3435,7 @@
             episodeIndex: episodeNumSelect.selectedIndex,
             animeId: anime.animeId,
             animeTitle: anime.animeTitle,
-            apiSource: apiSource ? { name: apiSource.name, prefix: apiSource.prefix } : null,
+            apiSource: apiSource && apiSource.name && apiSource.prefix ? { name: apiSource.name, prefix: apiSource.prefix } : null,
         }
         const seasonInfo = {
             name: anime.animeTitle,
