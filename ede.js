@@ -245,6 +245,7 @@
         debugH5VideoAdapterEnable: { id: 'danmakuDebugH5VideoAdapterEnable', defaultValue: false, name: '查看视频适配器情况' },
         quickDebugOn: { id: 'danmakuQuickDebugOn', defaultValue: false, name: '快速调试' },
         customeDandanplayApiPrefix: { id: 'danmakuCustomeDandanplayApiPrefix', defaultValue: corsProxy + 'https://api.dandanplay.net/api/v2', name: '弹幕Api' },
+        danmakuApiList: { id: 'danmakuApiList', defaultValue: [], name: '额外弹幕接口列表' },
         customeDanmakuUrl: { id: 'danmakuCustomeDanmakuUrl', defaultValue: requireDanmakuPath, name: '弹幕引擎依赖' },
         customeGetCommentUrl: { id: 'danmakuCustomeGetCommentUrl', defaultValue: getApiTl(dandanplayApi.getComment), name: '获取指定弹幕库的所有弹幕' },
         customeGetExtcommentUrl: { id: 'danmakuCustomeGetExtcommentUrl', defaultValue: getApiTl(dandanplayApi.getExtcomment), name: '获取指定第三方url的弹幕' },
@@ -335,6 +336,8 @@
         bangumiPostPercentDiv: 'bangumiPostPercentDiv',
         customeUrlsDiv: 'customeUrlsDiv',
         customeDandanplayApiDiv: 'customeDandanplayApiDiv',
+        danmakuApiListDiv: 'danmakuApiListDiv',
+        danmakuApiListContainer: 'danmakuApiListContainer',
         customeDanmakuDiv: 'customeDanmakuDiv',
         customeGetCommentDiv: 'customeGetCommentDiv',
         customeGetExtcommentDiv: 'customeGetExtcommentDiv',
@@ -693,16 +696,59 @@
         return await ApiClient.getItem(ApiClient.getCurrentUserId(), id);
     }
 
+    function getAllDanmakuApis() {
+        const apiListStored = lsGetItem(lsKeys.danmakuApiList.id) || [];
+        
+        // Reconstruct API objects with functions from stored data
+        const apiList = apiListStored.map(stored => ({
+            name: stored.name,
+            prefix: stored.prefix,
+            getSearchEpisodes: (anime, episode, tmdbId) => 
+                `${stored.prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+            getComment: (episodeId, chConvert) => 
+                `${stored.prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
+            getExtcomment: (url) => 
+                `${stored.prefix}/extcomment?url=${encodeURI(url)}`,
+            getBangumi: (animeId) => 
+                `${stored.prefix}/bangumi/${animeId}`,
+            posterImg: (animeId) => 
+                `https://img.dandanplay.net/anime/${animeId}.jpg`
+        }));
+        
+        return [dandanplayApi, ...apiList];
+    }
+
     async function fetchSearchEpisodes(anime, episode, tmdbId) {
-        if (!anime || !tmdbId) { throw new Error('anime or tmdbId is required'); }
-        const url = dandanplayApi.getSearchEpisodes(anime, episode);
-        const animaInfo = await fetchJson(url)
-            .catch((error) => {
-                console.log('查询失败:', error);
-                return null;
-            });
-        console.log('查询成功', animaInfo);
-        return animaInfo;
+        if (!anime) { throw new Error('anime is required'); }
+        
+        const apis = getAllDanmakuApis();
+        
+        for (let i = 0; i < apis.length; i++) {
+            const api = apis[i];
+            const apiName = api.name || `接口${i + 1}`;
+            try {
+                const url = api.getSearchEpisodes(anime, episode, tmdbId);
+                console.log(`[${apiName}] 正在查询: ${anime}`);
+                
+                const animaInfo = await fetchJson(url);
+                
+                if (animaInfo && animaInfo.animes && animaInfo.animes.length > 0) {
+                    console.log(`[${apiName}] 查询成功, 找到 ${animaInfo.animes.length} 个结果`);
+                    return animaInfo;
+                } else {
+                    console.log(`[${apiName}] 查询成功但无结果, 尝试下一个接口`);
+                }
+            } catch (error) {
+                console.log(`[${apiName}] 查询失败:`, error);
+                if (i === apis.length - 1) {
+                    console.log('所有接口均查询失败');
+                    return null;
+                }
+                console.log('尝试下一个接口...');
+            }
+        }
+        
+        return null;
     }
 
     async function fetchComment(episodeId) {
@@ -2722,6 +2768,159 @@
             inputDiv.append(embyInput({ type: 'search', value: lsGetItem(obj.lsKey.id) }, onEnter));
             inputDiv.append(embyButton({ label: '确认', iconKey: iconKeys.check }, onEnter));
         });
+        
+        // Add danmaku API list management UI
+        buildDanmakuApiListSetting(container);
+    }
+
+    function buildDanmakuApiListSetting(container) {
+        const customeUrlsDiv = getById(eleIds.customeUrlsDiv, container);
+        const apiListHtml = `
+            <label class="${classes.embyLabel}">${lsKeys.danmakuApiList.name}: </label>
+            <div class="${classes.embyFieldDesc}">添加额外的弹幕接口,搜索时按顺序尝试,支持拖拽排序</div>
+            <div id="${eleIds.danmakuApiListContainer}" style="margin-bottom: 1em;"></div>
+            <div id="${eleIds.danmakuApiListDiv}" style="display: flex;margin-bottom: 1em;"></div>
+        `;
+        customeUrlsDiv.innerHTML += apiListHtml;
+        
+        const addApiDiv = getById(eleIds.danmakuApiListDiv, container);
+        addApiDiv.append(embyInput({ 
+            type: 'search', 
+            placeholder: '输入接口前缀,如: https://api.example.com/api/v2',
+            style: 'flex: 1;'
+        }, onAddDanmakuApi));
+        addApiDiv.append(embyButton({ label: '添加接口', iconKey: iconKeys.check }, onAddDanmakuApi));
+        
+        renderDanmakuApiList();
+    }
+
+    function onAddDanmakuApi(e) {
+        const input = getTargetInput(e);
+        const prefix = input.value.trim();
+        if (!prefix) {
+            embyToast({ text: '请输入接口前缀' });
+            return;
+        }
+        
+        const apiList = lsGetItem(lsKeys.danmakuApiList.id) || [];
+        
+        // Create new API object (only store data, not functions)
+        const newApi = {
+            name: `自定义接口${apiList.length + 1}`,
+            prefix: prefix
+        };
+        
+        apiList.push(newApi);
+        lsSetItem(lsKeys.danmakuApiList.id, apiList);
+        input.value = '';
+        renderDanmakuApiList();
+        embyToast({ text: '接口添加成功' });
+    }
+
+    function renderDanmakuApiList() {
+        const container = getById(eleIds.danmakuApiListContainer);
+        if (!container) return;
+        
+        container.innerHTML = '';
+        const apiList = lsGetItem(lsKeys.danmakuApiList.id) || [];
+        
+        if (apiList.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = classes.embyFieldDesc;
+            emptyDiv.textContent = '暂无额外接口';
+            container.appendChild(emptyDiv);
+            return;
+        }
+        
+        apiList.forEach((api, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.style.cssText = 'display: flex; align-items: center; margin-bottom: 0.5em; padding: 0.5em; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;';
+            itemDiv.draggable = true;
+            itemDiv.dataset.index = index;
+            
+            const nameLabel = document.createElement('label');
+            nameLabel.textContent = `${index + 1}. ${api.name}`;
+            nameLabel.style.cssText = 'flex: 1; margin-right: 0.5em;';
+            itemDiv.appendChild(nameLabel);
+            
+            const prefixLabel = document.createElement('label');
+            prefixLabel.textContent = api.prefix;
+            prefixLabel.className = classes.embyFieldDesc;
+            prefixLabel.style.cssText = 'flex: 2; margin-right: 0.5em;';
+            itemDiv.appendChild(prefixLabel);
+            
+            const upBtn = embyButton({ label: '↑', title: '上移' }, () => moveDanmakuApi(index, -1));
+            upBtn.style.marginRight = '0.2em';
+            upBtn.disabled = index === 0;
+            itemDiv.appendChild(upBtn);
+            
+            const downBtn = embyButton({ label: '↓', title: '下移' }, () => moveDanmakuApi(index, 1));
+            downBtn.style.marginRight = '0.2em';
+            downBtn.disabled = index === apiList.length - 1;
+            itemDiv.appendChild(downBtn);
+            
+            const removeBtn = embyButton({ label: '删除', iconKey: iconKeys.close }, () => removeDanmakuApi(index));
+            itemDiv.appendChild(removeBtn);
+            
+            // Drag and drop support
+            itemDiv.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', index);
+                itemDiv.style.opacity = '0.5';
+            });
+            
+            itemDiv.addEventListener('dragend', (e) => {
+                itemDiv.style.opacity = '1';
+            });
+            
+            itemDiv.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                itemDiv.style.borderColor = 'rgba(82, 181, 75, 0.8)';
+            });
+            
+            itemDiv.addEventListener('dragleave', (e) => {
+                itemDiv.style.borderColor = 'rgba(255,255,255,0.2)';
+            });
+            
+            itemDiv.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIndex = index;
+                itemDiv.style.borderColor = 'rgba(255,255,255,0.2)';
+                
+                if (fromIndex !== toIndex) {
+                    const apiList = lsGetItem(lsKeys.danmakuApiList.id) || [];
+                    const [movedItem] = apiList.splice(fromIndex, 1);
+                    apiList.splice(toIndex, 0, movedItem);
+                    lsSetItem(lsKeys.danmakuApiList.id, apiList);
+                    renderDanmakuApiList();
+                    embyToast({ text: '排序已更新' });
+                }
+            });
+            
+            container.appendChild(itemDiv);
+        });
+    }
+
+    function moveDanmakuApi(index, direction) {
+        const apiList = lsGetItem(lsKeys.danmakuApiList.id) || [];
+        const newIndex = index + direction;
+        
+        if (newIndex < 0 || newIndex >= apiList.length) return;
+        
+        [apiList[index], apiList[newIndex]] = [apiList[newIndex], apiList[index]];
+        lsSetItem(lsKeys.danmakuApiList.id, apiList);
+        renderDanmakuApiList();
+        embyToast({ text: '排序已更新' });
+    }
+
+    function removeDanmakuApi(index) {
+        const apiList = lsGetItem(lsKeys.danmakuApiList.id) || [];
+        apiList.splice(index, 1);
+        lsSetItem(lsKeys.danmakuApiList.id, apiList);
+        renderDanmakuApiList();
+        embyToast({ text: '接口已删除' });
     }
 
     function buildAbout(containerId) {
