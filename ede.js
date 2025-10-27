@@ -244,7 +244,7 @@
         debugTabIframeEnable: { id: 'danmakuDebugTabIframeEnable', defaultValue: false, name: '打开内嵌网页' },
         debugH5VideoAdapterEnable: { id: 'danmakuDebugH5VideoAdapterEnable', defaultValue: false, name: '查看视频适配器情况' },
         quickDebugOn: { id: 'danmakuQuickDebugOn', defaultValue: false, name: '快速调试' },
-        customeCorsProxyUrl: { id: 'danmakuCustomeCorsProxyUrl', defaultValue: corsProxy, name: '跨域代理前缀' },
+        customeDandanplayApiPrefix: { id: 'danmakuCustomeDandanplayApiPrefix', defaultValue: corsProxy + 'https://api.dandanplay.net/api/v2', name: '弹幕Api' },
         customeDanmakuUrl: { id: 'danmakuCustomeDanmakuUrl', defaultValue: requireDanmakuPath, name: '弹幕引擎依赖' },
         customeGetCommentUrl: { id: 'danmakuCustomeGetCommentUrl', defaultValue: getApiTl(dandanplayApi.getComment), name: '获取指定弹幕库的所有弹幕' },
         customeGetExtcommentUrl: { id: 'danmakuCustomeGetExtcommentUrl', defaultValue: getApiTl(dandanplayApi.getExtcomment), name: '获取指定第三方url的弹幕' },
@@ -334,7 +334,7 @@
         bangumiTokenLinkDiv: 'bangumiTokenLinkDiv',
         bangumiPostPercentDiv: 'bangumiPostPercentDiv',
         customeUrlsDiv: 'customeUrlsDiv',
-        customeCorsProxyDiv: 'customeCorsProxyDiv',
+        customeDandanplayApiDiv: 'customeDandanplayApiDiv',
         customeDanmakuDiv: 'customeDanmakuDiv',
         customeGetCommentDiv: 'customeGetCommentDiv',
         customeGetExtcommentDiv: 'customeGetExtcommentDiv',
@@ -375,9 +375,9 @@
                 , msg2: `Danmaku 依赖路径,index.html 引入的和篡改猴环境不会使用到,依赖已内置,
                         仅在被 CustomCssJS 执行的特殊环境下使用,支持相对/绝对/网络路径,
                         默认是相对路径等同 https://emby/web/ 和 /system/dashboard-ui/ ,非浏览器客户端必须使用网络路径`  },
-            { divId: eleIds.customeCorsProxyDiv, lsKey: lsKeys.customeCorsProxyUrl, rewrite: (tl) => { corsProxy = tl; }
-                , msg1: '仅弹弹 play API 跨域使用,限 URL 前缀反代方式,例如 cf_worker'
-                , msg2: '以下共用变量: { dandanplayApi.prefix: 反代前缀拼接的弹弹 play API 路径前缀, }' },
+            { divId: eleIds.customeDandanplayApiDiv, lsKey: lsKeys.customeDandanplayApiPrefix, rewrite: (tl) => { dandanplayApi.prefix = tl; }
+                , msg1: '弹弹 play API 前缀,可直接修改完整的 API 路径'
+                , msg2: '以下共用变量: { dandanplayApi.prefix: 弹弹 play API 路径前缀, }' },
             { divId: eleIds.customeGetCommentDiv, lsKey: lsKeys.customeGetCommentUrl, rewrite: (tl) => {
                 dandanplayApi.getComment = (episodeId, chConvert) => eval('`' + tl + '`');
             }, msg1: customeUrlMsg1, msg2: '变量: { episodeId: 章节 ID, chConvert: 简繁转换, }' },
@@ -3074,7 +3074,7 @@
 
     function checkRuntimeVars(exposeGlobalThis = true) {
         console.log('运行时变量检查');
-        console.log(lsKeys.customeCorsProxyUrl.name ,corsProxy);
+        console.log(lsKeys.customeDandanplayApiPrefix.name, dandanplayApi.prefix);
         console.log(lsKeys.customeDanmakuUrl.name, requireDanmakuPath);
         console.log('弹弹 play API 模板', dandanplayApi);
         if (exposeGlobalThis) { window.checkRuntimeVars = checkRuntimeVars; }
