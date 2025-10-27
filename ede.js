@@ -35,7 +35,7 @@
     const dandanplayApi = {
         name: '弹弹play主接口',
         prefix: corsProxy + 'https://api.dandanplay.net/api/v2',
-        getSearchEpisodes: (anime, episode, tmdbId) => `${dandanplayApi.prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+        getSearchEpisodes: (anime, episode, tmdbId) => `${dandanplayApi.prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
         getComment: (episodeId, chConvert) => `${dandanplayApi.prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
         getExtcomment: (url) => `${dandanplayApi.prefix}/extcomment?url=${encodeURI(url)}`,
         getBangumi: (animeId) => `${dandanplayApi.prefix}/bangumi/${animeId}`,
@@ -705,7 +705,7 @@
             name: stored.name,
             prefix: stored.prefix,
             getSearchEpisodes: (anime, episode, tmdbId) => 
-                `${stored.prefix}/search/episodes?anime=${anime}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+                `${stored.prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
             getComment: (episodeId, chConvert) => 
                 `${stored.prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
             getExtcomment: (url) => 
@@ -717,6 +717,34 @@
         }));
         
         return [dandanplayApi, ...apiList];
+    }
+
+    function getApiByNameAndPrefix(name, prefix) {
+        // If no name/prefix provided, return default API
+        if (!name || !prefix) {
+            return dandanplayApi;
+        }
+        
+        // Check if it's the official API
+        if (dandanplayApi.name === name && dandanplayApi.prefix === prefix) {
+            return dandanplayApi;
+        }
+        
+        // Reconstruct API object from name and prefix
+        return {
+            name: name,
+            prefix: prefix,
+            getSearchEpisodes: (anime, episode, tmdbId) => 
+                `${prefix}/search/episodes?anime=${encodeURIComponent(anime)}${episode ? `&episode=${episode}` : ''}${tmdbId ? `&tmdbId=${tmdbId}` : ''}`,
+            getComment: (episodeId, chConvert) => 
+                `${prefix}/comment/${episodeId}?withRelated=true&chConvert=${chConvert}`,
+            getExtcomment: (url) => 
+                `${prefix}/extcomment?url=${encodeURI(url)}`,
+            getBangumi: (animeId) => 
+                `${prefix}/bangumi/${animeId}`,
+            posterImg: (animeId) => 
+                `https://img.dandanplay.net/anime/${animeId}.jpg`
+        };
     }
 
     async function fetchSearchEpisodes(anime, episode, tmdbId) {
@@ -735,7 +763,8 @@
                 
                 if (animaInfo && animaInfo.animes && animaInfo.animes.length > 0) {
                     console.log(`[${apiName}] 查询成功, 找到 ${animaInfo.animes.length} 个结果`);
-                    return animaInfo;
+                    // Return both the animaInfo and the API that was used
+                    return { animaInfo, apiSource: api };
                 } else {
                     console.log(`[${apiName}] 查询成功但无结果, 尝试下一个接口`);
                 }
@@ -752,15 +781,19 @@
         return null;
     }
 
-    async function fetchComment(episodeId) {
-        const url = dandanplayApi.getComment(episodeId, window.ede.chConvert);
+    async function fetchComment(episodeId, apiSource) {
+        // Use the provided API source, or fallback to dandanplayApi if not provided
+        const api = apiSource || dandanplayApi;
+        const apiName = api.name || '弹弹play主接口';
+        const url = api.getComment(episodeId, window.ede.chConvert);
+        console.log(`[${apiName}] 正在获取弹幕...`);
         return fetchJson(url)
             .then((data) => {
-                console.log('[获取]弹幕成功: ' + data.comments.length);
+                console.log(`[${apiName}] 获取弹幕成功: ${data.comments.length} 条`);
                 return data.comments;
             })
             .catch((error) => {
-                console.log('[获取]弹幕失败:', error);
+                console.log(`[${apiName}] 获取弹幕失败:`, error);
                 return null;
             });
     }
@@ -1011,8 +1044,10 @@
         if (selectedSeasonInfo) {
             const newEpisode = episode + selectedSeasonInfo.episodeOffset;
             console.log(`命中seasonInfo缓存: ${selectedSeasonInfo.name},偏移量: ${selectedSeasonInfo.episodeOffset},集: ${newEpisode}`);
-            const animaInfo = await fetchSearchEpisodes(selectedSeasonInfo.name, newEpisode);
-            return { animaInfo, newEpisode, };
+            const searchResult = await fetchSearchEpisodes(selectedSeasonInfo.name, newEpisode);
+            if (searchResult) {
+                return { animaInfo: searchResult.animaInfo, newEpisode, apiSource: searchResult.apiSource };
+            }
         }
         return null;
     }
@@ -1032,10 +1067,10 @@
     async function tmdbAutoFailback(animeName, episodeIndex, tmdbId) {
         if (!tmdbId) { return null; }
         console.log(`标题名: ${animeName},自动匹配未查询到结果,将使用元信息中的 tmdbId,重试一次`);
-        animaInfo = await fetchSearchEpisodes(animeOriginalTitle, episodeIndex);
-        if (animaInfo.animes.length < 1) { return null; }
+        const searchResult = await fetchSearchEpisodes(animeOriginalTitle, episodeIndex);
+        if (!searchResult || searchResult.animaInfo.animes.length < 1) { return null; }
         console.log(`使用原标题名: ${animeOriginalTitle},自动匹配成功`);
-        return { animeName, animaInfo, animeOriginalTitle, };
+        return { animeName, animaInfo: searchResult.animaInfo, animeOriginalTitle, apiSource: searchResult.apiSource };
     }
 
     async function oriTitleAutoFailback(animeName, episodeIndex, animeOriginalTitle) {
@@ -1045,25 +1080,25 @@
         if (!animeOriginalTitle) { return null; }
         console.log(`标题名: ${animeName},自动匹配未查询到结果,将使用原标题名,重试一次`);
         // const animeOriginalTitle = seriesOrMovieInfo.OriginalTitle;
-        animaInfo = await fetchSearchEpisodes(animeOriginalTitle, episodeIndex);
-        if (animaInfo.animes.length < 1) { return null; }
+        const searchResult = await fetchSearchEpisodes(animeOriginalTitle, episodeIndex);
+        if (!searchResult || searchResult.animaInfo.animes.length < 1) { return null; }
         console.log(`使用原标题名: ${animeOriginalTitle},自动匹配成功`);
-        return { animeName, animaInfo, animeOriginalTitle, };
+        return { animeName, animaInfo: searchResult.animaInfo, animeOriginalTitle, apiSource: searchResult.apiSource };
     }
 
     async function movieAutoFailback(animeName, episodeIndex) {
         console.log(`自动匹配未查询到结果,可能为非番剧,将移除章节过滤,重试一次`);
-        let animaInfo = await fetchSearchEpisodes(animeName);
-        if (animaInfo.animes.length > 0) {
+        const searchResult = await fetchSearchEpisodes(animeName);
+        if (searchResult && searchResult.animaInfo.animes.length > 0) {
             console.log(`移除章节过滤,自动匹配成功,转换为目标章节索引 0`);
             if (isNaN(episodeIndex)) { episodeIndex = 0; }
-            // const episodeInfo = animaInfo.animes[0].episodes[episodeIndex - 1 ?? 0];
-            const episodeInfo = animaInfo.animes[0].episodes[episodeIndex];
+            // const episodeInfo = searchResult.animaInfo.animes[0].episodes[episodeIndex - 1 ?? 0];
+            const episodeInfo = searchResult.animaInfo.animes[0].episodes[episodeIndex];
             if (!episodeInfo) {
                 return null;
             }
-            animaInfo.animes[0].episodes = [episodeInfo];
-            return { animeName, animaInfo, };
+            searchResult.animaInfo.animes[0].episodes = [episodeInfo];
+            return { animeName, animaInfo: searchResult.animaInfo, apiSource: searchResult.apiSource };
         }
     }
 
@@ -1072,19 +1107,25 @@
         console.log(`[自动匹配] 标题名: ${animeName}` + (episode ? `,章节过滤: ${episode}` : ''));
         let animeOriginalTitle = '';
         let animaInfo;
+        let apiSource;
         // 使用缓存中的剧集标题与集偏移量进行匹配
         let animaRes = await lsSeasonSearchEpisodes(_season_key, episode);
         if (animaRes) {
             animaInfo = animaRes.animaInfo;
+            apiSource = animaRes.apiSource;
             const bgmEpisodeIndex = animaRes.newEpisode - 1;
             if (animaInfo && animaInfo.animes.length > 0) {
-                return { animeOriginalTitle, animaInfo, bgmEpisodeIndex, };
+                return { animeOriginalTitle, animaInfo, bgmEpisodeIndex, apiSource };
             }
         }
         // 默认匹配方式
-        animaInfo = await fetchSearchEpisodes(animeName, episode);
-        if (animaInfo && animaInfo.animes.length > 0) {
-            return { animeOriginalTitle, animaInfo, };
+        const searchResult = await fetchSearchEpisodes(animeName, episode);
+        if (searchResult) {
+            animaInfo = searchResult.animaInfo;
+            apiSource = searchResult.apiSource;
+            if (animaInfo && animaInfo.animes.length > 0) {
+                return { animeOriginalTitle, animaInfo, apiSource };
+            }
         }
         const res = await autoFailback(animeName, episode, seriesOrMovieId);
         if (res) {
@@ -1109,7 +1150,7 @@
             return null;
         }
 
-        const { animeOriginalTitle, animaInfo } = res;
+        const { animeOriginalTitle, animaInfo, apiSource } = res;
         let selectAnime_id = 1;
         if (animeId != -1) {
             for (let index = 0; index < animaInfo.animes.length; index++) {
@@ -1128,6 +1169,7 @@
             animeId: animaInfo.animes[selectAnime_id].animeId,
             animeTitle: animaInfo.animes[selectAnime_id].animeTitle,
             animeOriginalTitle,
+            apiSource: apiSource && apiSource.name && apiSource.prefix ? { name: apiSource.name, prefix: apiSource.prefix } : null,
         };
         localStorage.setItem(_episode_key, JSON.stringify(episodeInfo));
         return episodeInfo;
@@ -1395,6 +1437,12 @@
             .then(
                 (episodeId) => {
                     if (episodeId) {
+                        // Get the API source from episode_info
+                        const apiSourceInfo = window.ede.episode_info.apiSource;
+                        const apiSource = apiSourceInfo ? 
+                            getApiByNameAndPrefix(apiSourceInfo.name, apiSourceInfo.prefix) : 
+                            null;
+                        
                         if (loadType === LOAD_TYPE.RELOAD && window.ede.danmuCache[episodeId]) {
                             createDanmaku(window.ede.danmuCache[episodeId])
                                 .then(() => {
@@ -1404,7 +1452,7 @@
                                     console.log(err);
                                 });
                         } else {
-                            fetchComment(episodeId).then((comments) => {
+                            fetchComment(episodeId, apiSource).then((comments) => {
                                 window.ede.danmuCache[episodeId] = comments;
                                 createDanmaku(comments)
                                     .then(() => {
@@ -3308,9 +3356,9 @@
         const spinnerEle = getByClass(classes.mdlSpinner);
         spinnerEle.classList.remove('hide');
 
-        const animaInfo = await fetchSearchEpisodes(searchName);
+        const searchResult = await fetchSearchEpisodes(searchName);
         spinnerEle.classList.add('hide');
-        if (!animaInfo || animaInfo.animes.length < 1) {
+        if (!searchResult || !searchResult.animaInfo || searchResult.animaInfo.animes.length < 1) {
             danmakuRemarkEle.innerText = '搜索结果为空';
             getById(eleIds.danmakuSwitchEpisode).disabled = true;
             getById(eleIds.danmakuEpisodeFlag).hidden = true;
@@ -3322,8 +3370,9 @@
         const danmakuEpisodeNumDiv = getById(eleIds.danmakuEpisodeNumDiv);
         danmakuAnimeDiv.innerHTML = '';
         danmakuEpisodeNumDiv.innerHTML = '';
-        const animes = animaInfo.animes;
+        const animes = searchResult.animaInfo.animes;
         window.ede.searchDanmakuOpts.animes = animes;
+        window.ede.searchDanmakuOpts.apiSource = searchResult.apiSource;
 
         let selectAnimeIdx = animes.findIndex(anime => anime.animeId == window.ede.searchDanmakuOpts.animeId);
         selectAnimeIdx = selectAnimeIdx !== -1 ? selectAnimeIdx : 0;
@@ -3378,6 +3427,7 @@
         const animeSelect = getById(eleIds.danmakuAnimeSelect);
         const episodeNumSelect = getById(eleIds.danmakuEpisodeNumSelect);
         const anime = window.ede.searchDanmakuOpts.animes[animeSelect.selectedIndex];
+        const apiSource = window.ede.searchDanmakuOpts.apiSource;
 
         const episodeInfo = {
             episodeId: episodeNumSelect.value,
@@ -3385,6 +3435,7 @@
             episodeIndex: episodeNumSelect.selectedIndex,
             animeId: anime.animeId,
             animeTitle: anime.animeTitle,
+            apiSource: apiSource && apiSource.name && apiSource.prefix ? { name: apiSource.name, prefix: apiSource.prefix } : null,
         }
         const seasonInfo = {
             name: anime.animeTitle,
